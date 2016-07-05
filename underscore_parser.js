@@ -193,4 +193,149 @@
         };
     };
 
+    // An internal function for creating a new object that inherits from another.
+    // --------------
+    // 创建一个通过原型继承prototype的对象的内部方法
+    // 如果ES5存在Object.create就调用该方法创建，反之则通过内部函数Ctor的prototype指向prototype然后实例化
+    // 最后将内部函数Ctor的prototype指向null
+    var baseCreate = function(prototype) {
+        if (!_.isObject(prototype)) return {};
+        if (nativeCreate) return nativeCreate(prototype);
+        Ctor.prototype = prototype;
+        var result = new Ctor;
+        Ctor.prototype = null;
+        return result;
+    };
+
+    // 根据属性，创建一个获取该属性值的闭包
+    var property = function(key) {
+        return function(obj) {
+            return obj == null ? void 0 : obj[key];
+        };
+    };
+
+    // Math.pow(2, 53) - 1 是 JavaScript 中能精确表示的最大数字
+    var MAX_ARRAY_INDEX = Math.pow(2, 53) - 1;
+
+    // 创建一个返回length属性值的函数
+    var getLength = property('length');
+
+    // 判断collection是否是类数组结构
+    // 根据collection的length是否为数字类型，并且是大于等于0小于等于最大精确整数的
+    var isArrayLike = function(collection) {
+        var length = getLength(collection);
+        return typeof length == 'number' && length >= 0 && length <= MAX_ARRAY_INDEX;
+    };
+
+    // Collection Functions
+    // --------------------
+    // 扩展集合(数组或对象)方法列表
+
+    // The cornerstone, an `each` implementation, aka `forEach`.
+    // Handles raw objects in addition to array-likes. Treats all
+    // sparse array-likes as if they were dense.
+    // --------------------
+    // 和ES5的Array.prototype.forEach用法一致
+    // 遍历数组或对象的每一个元素
+    // 第一个参数是数组或对象
+    // 第二个参数是遍历函数
+    // 第三个是遍历函数绑定的上下文
+    // iteratee有三个参数，依次是元素值、key、集合
+    // 假定不会传入类似{length: 10}这样的对象
+    _.each = _.forEach = function(obj, iteratee, context) {
+        iteratee = optimizeCb(iteratee, context);
+        var i, length;
+        if (isArrayLike(obj)) {
+            for (i = 0, length = obj.length; i < length; i++) {
+                iteratee(obj[i], i, obj);
+            }
+        } else {
+            var keys = _.keys(obj);
+            for (i = 0, length = keys.length; i < length; i++) {
+                iteratee(obj[keys[i]], keys[i], obj);
+            }
+        }
+        return obj;
+    };
+
+    // Return the results of applying the iteratee to each element.
+    // --------------------
+    // 和ES5的Array.prototype.map用法一致
+    // 遍历数组或对象的每一个元素
+    // 将元素值传入iteratee
+    // 将iteratee返回值存入新数组
+    // 返回新数组
+    _.map = _.collect = function(obj, iteratee, context) {
+        // 创建一个参数依次为value, key, collection的函数
+        iteratee = cb(iteratee, context);
+
+        // 巧妙的使用for ()形式遍历数组或对象
+        // 如果是对象，获取对象的属性数组
+        var keys = !isArrayLike(obj) && _.keys(obj),
+        // 如果是对象，获取对象的数组数组的长度，反之，获取数组的长度
+            length = (keys || obj).length,
+        // 创建指定长度的新数组
+            results = Array(length);
+        for (var index = 0; index < length; index++) {
+            // 如果是对象，当前key从对象的属性数组根据当前索引得到
+            var currentKey = keys ? keys[index] : index;
+            // 新数组存储iteartee结果
+            results[index] = iteratee(obj[currentKey], currentKey, obj);
+        }
+        // 返回新数组
+        return results;
+    };
+
+    // Create a reducing function iterating left or right.
+    // --------------------
+    // 根据dir，创建reduce
+    // dir > 0 _.reduce
+    // dir < 0 _.reduceRight
+    var createReduce = function(dir) {
+        // Wrap code that reassigns argument variables in a separate function than
+        // the one that accesses `arguments.length` to avoid a perf hit. (#1991)
+        // --------------------
+        // 创建reduce
+        // 和ES5使用一致
+        // 遍历对象或数组的每一个元素，传入初始值作为iteratee的第一个参数
+        // 将当前iteratee的结果插入下一个iteratee第一个参数
+        // 返回最终的结果
+        var reducer = function(obj, iteratee, memo, initial) {
+            // 巧妙的使用for ()遍历数组或对象
+            // 如果obj是对象，得到对象的属性数组
+            var keys = !isArrayLike(obj) && _.keys(obj),
+            // 如果obj是对象，获取对象数组的属性数组的长度
+                length = (keys || obj).length,
+            // 得到根据dir的不同遍历起始值
+            // 如果dir > 0，遍历起始值为0
+            // 如果dir < 0，遍历起始值为length - 1
+                index = dir > 0 ? 0 : length - 1;
+
+            // 如果没传入初始值
+            // dir > 0 初始值为数组或对象的第一个元素
+            // dir < 0 初始值为数组或对象的最后一个元素
+            // 得到遍历起始值的最终值
+            if (!initial) {
+                memo = obj[keys ? keys[index] : index];
+                index += dir;
+            }
+
+            // 如果dir > 0，遍历起始值结束条件为 >= length
+            // 如果dir < 0，遍历起始值结束条件为 < 0
+            for (; index >= 0 && index < length; index += dir) {
+                var currentKey = keys ? keys[index] : index;
+                memo = iteratee(memo, obj[currentKey], currentKey, obj);
+            }
+
+            // 返回最终的结果
+            return memo;
+        };
+
+        return function(obj, iteratee, memo, context) {
+            // 如果传入的实参大于等于3，则传入了初始值，否则没有传入初始值
+            var initial = arguments.length >= 3;
+            return reducer(obj, optimizeCb(iteratee, context, 4), memo, initial);
+        };
+    };
+
 })();

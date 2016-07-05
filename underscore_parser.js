@@ -506,6 +506,8 @@
     };
 
     // Return the minimum element (or element-based computation).
+    // --------------------
+    // 查找数组中的最小值
     _.min = function(obj, iteratee, context) {
         var result = Infinity, lastComputed = Infinity,
             value, computed;
@@ -530,6 +532,161 @@
         return result;
     };
 
+    // Shuffle a collection.
+    // --------------------
+    // 打乱数组或对象的元素
+    _.shuffle = function(obj) {
+        return _.sample(obj, Infinity);
+    };
+
+    // Sample **n** random values from a collection using the modern version of the
+    // [Fisher-Yates shuffle](http://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+    // If **n** is not specified, returns a single random element.
+    // The internal `guard` argument allows it to work with `map`.
+    // --------------------
+    // 如果n不存在，随机返回对象或数组的一个元素
+    // 如果n存在，返回n个随机位置代表的元素的数组
+    _.sample = function(obj, n, guard) {
+        // 随机返回一个元素
+        if (n == null || guard) {
+            if (!isArrayLike(obj)) obj = _.values(obj);
+            return obj[_.random(obj.length - 1)];
+        }
+
+        // 返回n个随机元素的数组
+        // 如果obj是数组，复制一个新数组
+        // 如果obj是对象，得到对象的属性值数组
+        var sample = isArrayLike(obj) ? _.clone(obj) : _.values(obj);
+        // 得到对象或数组的长度
+        var length = getLength(sample);
+        // 确保需要返回的个数是0或正整数
+        n = Math.max(Math.min(n, length), 0);
+        // 获取最后一个元素的位置
+        var last = length - 1;
+        for (var index = 0; index < n; index++) {
+            // 获取从index到n的随机位置
+            var rand = _.random(index, last);
+            // 元素交换位置
+            var temp = sample[index];
+            sample[index] = sample[rand];
+            sample[rand] = temp;
+        }
+        return sample.slice(0, n);
+    };
+
+    // Sort the object's values by a criterion produced by an iteratee.
+    // 数组或对象排序
+    // 根据将value、key、collection传入到iteratee返回的值进行排序
+    _.sortBy = function(obj, iteratee, context) {
+        var index = 0;
+        iteratee = cb(iteratee, context);
+        return _.pluck(_.map(obj, function(value, key, list) {
+            return {
+                value: value,
+                index: index++, // 如果当前迭代次数的iteratee返回的值和下一个迭代次数的iteratee返回值相同，通过index属性进行排序
+                criteria: iteratee(value, key, list) // 当前迭代次数的iteratee返回值
+            };
+        }).sort(function(left, right) {
+            var a = left.criteria; // 上一个元素的cirteria值
+            var b = right.criteria; // 下一个元素的cirteria值
+            // 如果值不同
+            if (a !== b) {
+                // 如果a > b a在b的后面
+                if (a > b || a === void 0) return 1;
+                // 如果a < b a在b的前面
+                if (a < b || b === void 0) return -1;
+            }
+
+            // 如果值相同，更加元素的index值
+            // 如果left.index - right.index > 0，a在b的后面
+            // 如果left.index - right.index < 0，a在b的前面
+            return left.index - right.index;
+        }), 'value');
+    };
+
+    // An internal function used for aggregate "group by" operations.
+    // --------------------
+    // 数组分组
+    var group = function(behavior, partition) {
+        return function(obj, iteratee, context) {
+            // 表示分组存储的集合
+            var result = partition ? [[], []] : {};
+            // 传入的iteratee，作用是得到分组的key
+            iteratee = cb(iteratee, context);
+            _.each(obj, function(value, index) {
+                // 取到分组的key
+                var key = iteratee(value, index, obj);
+                // 根据key，进行分组
+                behavior(result, value, key);
+            });
+            // 返回分组后的集合
+            return result;
+        };
+    };
+
+    // Groups the object's values by a criterion. Pass either a string attribute
+    // to group by, or a function that returns the criterion.
+    // --------------------
+    // 根据key，进行分组
+    // 如果key不同，创建key，赋予一个初始值为value的数组
+    // 如果key相同，在当前key代表的数组push value
+    _.groupBy = group(function(result, value, key) {
+        if (_.has(result, key)) result[key].push(value); else result[key] = [value];
+    });
+
+    // Indexes the object's values by a criterion, similar to `groupBy`, but for
+    // when you know that your index values will be unique.
+    // --------------------
+    // 和_.groupBy差不多，区别在于key如果是唯一的，那么用这个key作为分组的
+    _.indexBy = group(function(result, value, key) {
+        result[key] = value;
+    });
+
+    // Counts instances of an object that group by a certain criterion. Pass
+    // either a string attribute to count by, or a function that returns the
+    // criterion.
+    // --------------------
+    // 统计符合规则(key)的个数
+    _.countBy = group(function(result, value, key) {
+        if (_.has(result, key)) result[key]++; else result[key] = 1;
+    });
+
+    var reStrSymbol = /[^\ud800-\udfff]|[\ud800-\udbff][\udc00-\udfff]|[\ud800-\udfff]/g;
+    // Safely create a real, live array from anything iterable.
+    // --------------------
+    // 转换成数组
+    _.toArray = function(obj) {
+        if (!obj) return [];
+        // 如果obj是数组，则拷贝一个完全匹配value，内存指针不同的新数组
+        if (_.isArray(obj)) return slice.call(obj);
+        if (_.isString(obj)) {
+            // Keep surrogate pair characters together
+            return obj.match(reStrSymbol);
+        }
+        // 如果是具有length属性的类数组对象，则重新拷贝一个完全匹配value，内存指针不同的新数组
+        // 是否用slice.call更方便？
+        if (isArrayLike(obj)) return _.map(obj, _.identity);
+        // 如果是纯对象，则得到属性值数组
+        return _.values(obj);
+    };
+
+    // Return the number of elements in an object.
+    // --------------------
+    // 获得数组、类数组对象、纯对象的属性名数组的长度
+    _.size = function(obj) {
+        if (obj == null) return 0;
+        return isArrayLike(obj) ? obj.length : _.keys(obj).length;
+    };
+
+    // Split a collection into two arrays: one whose elements all satisfy the given
+    // predicate, and one whose elements all do not satisfy the predicate.
+    // --------------------
+    // 按照pass(是否满足条件)进行对象或数组分组（二维数组）
+    // 二维数组第一个元素添加所有满足条件的value
+    // 二维数组第二个元素添加所有不满足条件的value
+    _.partition = group(function(result, value, pass) {
+        result[pass ? 0 : 1].push(value);
+    }, true);
 
 
     // Generator function to create the findIndex and findLastIndex functions.

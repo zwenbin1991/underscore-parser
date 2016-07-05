@@ -688,6 +688,98 @@
         result[pass ? 0 : 1].push(value);
     }, true);
 
+    // Array Functions
+    // ---------------
+    // 数组扩展方法列表
+
+
+    // Get the first element of an array. Passing **n** will return the first N
+    // values in the array. Aliased as `head` and `take`. The **guard** check
+    // allows it to work with `_.map`.
+    // ---------------
+    // 返回数组第一个元素
+    // 如果有n，返回数组前n个元素
+    _.first = _.head = _.take = function(array, n, guard) {
+        if (array == null || array.length < 1) return void 0;
+        if (n == null || guard) return array[0];
+        return _.initial(array, array.length - n);
+    };
+
+    // Returns everything but the last entry of the array. Especially useful on
+    // the arguments object. Passing **n** will return all the values in
+    // the array, excluding the last N.
+    // ---------------
+    // 返回去除最后n个元素的全部元素
+    _.initial = function(array, n, guard) {
+        return slice.call(array, 0, Math.max(0, array.length - (n == null || guard ? 1 : n)));
+    };
+
+    // Get the last element of an array. Passing **n** will return the last N
+    // values in the array.
+    // ---------------
+    // 返回数组最后一个元素
+    // 如果有n，返回数组后n个元素
+    _.last = function(array, n, guard) {
+        if (array == null || array.length < 1) return void 0;
+        if (n == null || guard) return array[array.length - 1];
+        return _.rest(array, Math.max(0, array.length - n));
+    };
+
+    // Returns everything but the first entry of the array. Aliased as `tail` and `drop`.
+    // Especially useful on the arguments object. Passing an **n** will return
+    // the rest N values in the array.
+    // ---------------
+    // 返回去除前n个元素的全部元素
+    _.rest = _.tail = _.drop = function(array, n, guard) {
+        return slice.call(array, n == null || guard ? 1 : n);
+    };
+
+    // Trim out all falsy values from an array.
+    // ---------------
+    // 范围一个元素不为假值的数组副本
+    // 在JavaScript中，假值包括 false, 0, '', null, undefined, NaN
+    _.compact = function(array) {
+        return _.filter(array, Boolean);
+    };
+
+    // Internal implementation of a recursive `flatten` function.
+    // ---------------
+    // 按条件展开数组
+    // input：源数组
+    // shallow：是否浅查找
+    // strict：是否过滤非数组元素
+    // input = [['xx', 'oo'], [['hao'], ['wu'], ['a']], true]
+    // shallow = true, strict = true  => ['xx', 'oo', ['hao', 'wu', 'a']] 备注：浅查找，过滤掉非数组元素
+    // shallow = true, strict = false  => ['xx', 'oo', ['hao', 'wu', 'a'], true] 备注：浅查找，不过滤掉非数组元素
+    // shallow = false, strict = true => [] 备注：深查找，过滤掉非数组元素
+    // shallow = false, strict = false => ['xx', 'oo', 'hao', 'wu', 'a', true] 备注：深查找，不过滤掉非数组严肃
+    var flatten = function(input, shallow, strict, output) {
+        output = output || [];
+        var idx = output.length;
+        // 遍历input
+        for (var i = 0, length = getLength(input); i < length; i++) {
+            var value = input[i];
+            // 如果数组元素是数组或者arguments对象
+            if (isArrayLike(value) && (_.isArray(value) || _.isArguments(value))) {
+                // Flatten current level of array or arguments object.
+                // ---------------
+                // 如果是浅查找，展开value每个元素
+                if (shallow) {
+                    var j = 0, len = value.length;
+                    while (j < len) output[idx++] = value[j++];
+                } else {
+                // 如果是深查找，重新迭代value每个元素
+                    flatten(value, shallow, strict, output);
+                // 重新设置idx（当前output开始索引），其实这个表达式可以省略的，js中数组是自扩展的，只需把[idx++]格式换成push就可以
+                    idx = output.length;
+                }
+            } else if (!strict) {
+                // 如果当前元素是非数组元素，output追加该当前元素
+                output[idx++] = value;
+            }
+        }
+        return output;
+    };
 
     // Generator function to create the findIndex and findLastIndex functions.
     // --------------------

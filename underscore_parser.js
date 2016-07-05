@@ -296,7 +296,6 @@
         // the one that accesses `arguments.length` to avoid a perf hit. (#1991)
         // --------------------
         // 创建reduce
-        // 和ES5使用一致
         // 遍历对象或数组的每一个元素，传入初始值作为iteratee的第一个参数
         // 将当前iteratee的结果插入下一个iteratee第一个参数
         // 返回最终的结果
@@ -337,5 +336,221 @@
             return reducer(obj, optimizeCb(iteratee, context, 4), memo, initial);
         };
     };
+
+    // **Reduce** builds up a single result from a list of values, aka `inject`,
+    // or `foldl`.
+    // --------------------
+    // 和ES5的Array.prototype.reduce使用方法一致
+    _.reduce = _.foldl = _.inject = createReduce(1);
+
+    // The right-associative version of reduce, also known as `foldr`.
+    // --------------------
+    // 和ES5的Array.prototype.reduceRight使用方法一致
+    _.reduceRight = _.foldr = createReduce(-1);
+
+    // Return the first value which passes a truth test. Aliased as `detect`.
+    // --------------------
+    // 查找对象或数组第一个满足条件(predicate返回true)的元素
+    _.find = _.detect = function(obj, predicate, context) {
+        var keyFinder = isArrayLike(obj) ? _.findIndex : _.findKey;
+        var key = keyFinder(obj, predicate, context);
+        if (key !== void 0 && key !== -1) return obj[key];
+    };
+
+    // Return all the elements that pass a truth test.
+    // Aliased as `select`.
+    // --------------------
+    // 和ES5的Array.prototype.filter一致
+    // 存储数组或对象满足条件的元素
+    _.filter = _.select = function(obj, predicate, context) {
+        var results = [];
+        predicate = cb(predicate, context);
+        _.each(obj, function(value, index, list) {
+            if (predicate(value, index, list)) results.push(value);
+        });
+        return results;
+    };
+
+    // Return all the elements for which a truth test fails.
+    // --------------------
+    // 存储数组或对象不满足条件的元素
+    _.reject = function(obj, predicate, context) {
+        return _.filter(obj, _.negate(cb(predicate)), context);
+    };
+
+    // Returns a negated version of the passed-in predicate.
+    // --------------------
+    // 返回predicate相反的结果
+    _.negate = function(predicate) {
+        return function() {
+            return !predicate.apply(this, arguments);
+        };
+    };
+
+    // Determine whether all of the elements match a truth test.
+    // Aliased as `all`.
+    // --------------------
+    // 如果对象或数组存在一个不满足条件的元素，则返回false
+    _.every = _.all = function(obj, predicate, context) {
+        predicate = cb(predicate, context);
+        var keys = !isArrayLike(obj) && _.keys(obj),
+            length = (keys || obj).length;
+        for (var index = 0; index < length; index++) {
+            var currentKey = keys ? keys[index] : index;
+            if (!predicate(obj[currentKey], currentKey, obj)) return false;
+        }
+        return true;
+    };
+
+    // Determine if at least one element in the object matches a truth test.
+    // Aliased as `any`.
+    // --------------------
+    // 如果对象或数组存在一个满足条件的元素，则返回true
+    _.some = _.any = function(obj, predicate, context) {
+        predicate = cb(predicate, context);
+        var keys = !isArrayLike(obj) && _.keys(obj),
+            length = (keys || obj).length;
+        for (var index = 0; index < length; index++) {
+            var currentKey = keys ? keys[index] : index;
+            if (predicate(obj[currentKey], currentKey, obj)) return true;
+        }
+        return false;
+    };
+
+    // Determine if the array or object contains a given item (using `===`).
+    // Aliased as `includes` and `include`.
+    // --------------------
+    // 判断数组或者对象是否包含给定的元素
+    // 如果obj是对象，则从属性值数组查找
+    _.contains = _.includes = _.include = function(obj, item, fromIndex, guard) {
+        if (!isArrayLike(obj)) obj = _.values(obj);
+        if (typeof fromIndex != 'number' || guard) fromIndex = 0;
+        return _.indexOf(obj, item, fromIndex) >= 0;
+    };
+
+    // Invoke a method (with arguments) on every item in a collection.
+    // --------------------
+    // 调用函数
+    // 如果method是函数，改变method的上下文为数组或对象的元素,传入从第三个实参开始到结束的所有实参，返回的新数组存储调用结果
+    // 如果method是字符串，传入从第三个实参开始到结束的所有实参
+    _.invoke = restArgs(function(obj, method, args) {
+        // 判断method是否是函数
+        var isFunc = _.isFunction(method);
+        // 数组或对象进行遍历
+        return _.map(obj, function(value) {
+            // 如果method是函数，直接得到，否则通过method作为元素的key
+            var func = isFunc ? method : value[method];
+            // 改变func的上下文，并将args所有参数传入func
+            // 返回结果
+            return func == null ? func : func.apply(value, args);
+        });
+    });
+
+    // Convenience version of a common use case of `map`: fetching a property.
+    // --------------------
+    // 获取对象或数组的属性数组
+    _.pluck = function(obj, key) {
+        return _.map(obj, _.property(key));
+    };
+
+    // Convenience version of a common use case of `filter`: selecting only objects
+    // containing specific `key:value` pairs.
+    // --------------------
+    // 通过浅拷贝attrs方式，存储数组或对象里的元素是否匹配attrs(键值对)的元素
+    _.where = function(obj, attrs) {
+        return _.filter(obj, _.matcher(attrs));
+    };
+
+    // Convenience version of a common use case of `find`: getting the first object
+    // containing specific `key:value` pairs.
+    // --------------------
+    // 通过浅拷贝attrs方式，返回第一个匹配到的元素
+    _.findWhere = function(obj, attrs) {
+        return _.find(obj, _.matcher(attrs));
+    };
+
+    // Return the maximum element (or element-based computation).
+    // --------------------
+    // 查找数组中的最大值
+    _.max = function(obj, iteratee, context) {
+        var result = -Infinity, lastComputed = -Infinity,
+            value, computed;
+        // 如果obj是数组或数组，并且iteratee不存在
+        if (iteratee == null || (typeof iteratee == 'number' && typeof obj[0] != 'object') && obj != null) {
+            // 如果obj是对象，获取属性值数组
+            obj = isArrayLike(obj) ? obj : _.values(obj);
+            for (var i = 0, length = obj.length; i < length; i++) {
+                value = obj[i];
+                // 过滤值为null或undefined
+                // result初始值为最小的负数
+                // 如果当前元素值大于result，重新将result赋予当前元素值
+                if (value != null && value > result) {
+                    result = value;
+                }
+            }
+        } else {
+            // 如果iteratee为函数
+            iteratee = cb(iteratee, context);
+            _.each(obj, function(v, index, list) {
+                // 获取iteratee的值
+                computed = iteratee(v, index, list);
+                // lastComputed初始值为最小的负数
+                // 如果传入元素值的iteratee结果大于lastComputed或当前记过===-Infinity，重新将lastComputed赋予当前iteratee的结果
+                if (computed > lastComputed || computed === -Infinity && result === -Infinity) {
+                    result = v;
+                    lastComputed = computed;
+                }
+            });
+        }
+        return result;
+    };
+
+    // Return the minimum element (or element-based computation).
+    _.min = function(obj, iteratee, context) {
+        var result = Infinity, lastComputed = Infinity,
+            value, computed;
+        if (iteratee == null || (typeof iteratee == 'number' && typeof obj[0] != 'object') && obj != null) {
+            obj = isArrayLike(obj) ? obj : _.values(obj);
+            for (var i = 0, length = obj.length; i < length; i++) {
+                value = obj[i];
+                if (value != null && value < result) {
+                    result = value;
+                }
+            }
+        } else {
+            iteratee = cb(iteratee, context);
+            _.each(obj, function(v, index, list) {
+                computed = iteratee(v, index, list);
+                if (computed < lastComputed || computed === Infinity && result === Infinity) {
+                    result = v;
+                    lastComputed = computed;
+                }
+            });
+        }
+        return result;
+    };
+
+
+
+    // Generator function to create the findIndex and findLastIndex functions.
+    // --------------------
+    // 创建根据dir，创建查找索引函数
+    // dir > 0，_.findIndex
+    // dir < 0, _.findLastIndex
+    var createPredicateIndexFinder = function(dir) {
+        return function(array, predicate, context) {
+            predicate = cb(predicate, context);
+            var length = getLength(array);
+            var index = dir > 0 ? 0 : length - 1;
+            for (; index >= 0 && index < length; index += dir) {
+                if (predicate(array[index], index, array)) return index;
+            }
+            return -1;
+        };
+    };
+
+    // Returns the first index on an array-like that passes a predicate test.
+    _.findIndex = createPredicateIndexFinder(1);
+    _.findLastIndex = createPredicateIndexFinder(-1);
 
 })();

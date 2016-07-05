@@ -905,6 +905,25 @@
     // _.zip(['xx', 1], ['oo', 2])
     _.zip = restArgs(_.unzip);
 
+    // Converts lists into objects. Pass either a single array of `[key, value]`
+    // pairs, or two parallel arrays of the same length -- one of keys, and one of
+    // the corresponding values.
+    // ---------------
+    // 数组转换成对象
+    // list: ['name', 'age', 'sex'] values: ['zwb', 21, 1] => {name: 'zwb', age: 21, sex: 1}
+    // list: [['name', 'zwb'], ['age', 21], ['sex': 1]] => {name: 'zwb', age: 21, sex: 1}
+    _.object = function(list, values) {
+        var result = {};
+        for (var i = 0, length = getLength(list); i < length; i++) {
+            if (values) {
+                result[list[i]] = values[i];
+            } else {
+                result[list[i][0]] = list[i][1];
+            }
+        }
+        return result;
+    };
+
     // Generator function to create the findIndex and findLastIndex functions.
     // --------------------
     // 创建根据dir，创建查找索引函数

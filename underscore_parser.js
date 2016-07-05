@@ -749,10 +749,10 @@
     // shallow：是否浅查找
     // strict：是否过滤非数组元素
     // input = [['xx', 'oo'], [['hao'], ['wu'], ['a']], true]
-    // shallow = true, strict = true  => ['xx', 'oo', ['hao', 'wu', 'a']] 备注：浅查找，过滤掉非数组元素
-    // shallow = true, strict = false  => ['xx', 'oo', ['hao', 'wu', 'a'], true] 备注：浅查找，不过滤掉非数组元素
-    // shallow = false, strict = true => [] 备注：深查找，过滤掉非数组元素
-    // shallow = false, strict = false => ['xx', 'oo', 'hao', 'wu', 'a', true] 备注：深查找，不过滤掉非数组严肃
+    // shallow == true, strict == true  => ['xx', 'oo', ['hao', 'wu', 'a']] 备注：浅查找，过滤掉非数组元素
+    // shallow == true, strict == false  => ['xx', 'oo', ['hao', 'wu', 'a'], true] 备注：浅查找，不过滤掉非数组元素
+    // shallow == false, strict == true => [] 备注：深查找，过滤掉非数组元素
+    // shallow == false, strict == false => ['xx', 'oo', 'hao', 'wu', 'a', true] 备注：深查找，不过滤掉非数组严肃
     var flatten = function(input, shallow, strict, output) {
         output = output || [];
         var idx = output.length;
@@ -780,6 +780,130 @@
         }
         return output;
     };
+
+    // Flatten out an array, either recursively (by default), or just one level.
+    // ---------------
+    // 根据浅查找或深查找并不过滤非数组元素进行展开数组
+    // array = [['xx', 'oo'], [['hao'], ['wu'], ['a']], true]
+    // shallow == true => ['xx', 'oo', ['hao', 'wu', 'a'], true]
+    // shallow == false => ['xx', 'oo', 'hao', 'wu', 'a', true]
+    _.flatten = function(array, shallow) {
+        return flatten(array, shallow, false);
+    };
+
+    // Return a version of the array that does not contain the specified value(s).
+    // ---------------
+    // 将传入_.without里的除第一个参数外的所有参数通过restArgs转成默认数组otherArrays
+    // otherArrays 就是一个[xx, oo]
+    // 返回array不存在otherArrays的元素
+    _.without = restArgs(function(array, otherArrays) {
+        return _.difference(array, otherArrays);
+    });
+
+    // Take the difference between one array and a number of other arrays.
+    // Only the elements present in just the first array will remain.
+    // ---------------
+    // rest是默认参数数组，首先通过浅查找、过滤非数组元素进行展开
+    // 这里rest是二维数组，展开后得到一维数组
+    // 通过_.filter存储array的不存在rest的元素
+    _.difference = restArgs(function(array, rest) {
+        rest = flatten(rest, true, true);
+        return _.filter(array, function(value){
+            return !_.contains(rest, value);
+        });
+    });
+
+    // Produce a duplicate-free version of the array. If the array has already
+    // been sorted, you have the option of using a faster algorithm.
+    // Aliased as `unique`.
+    // ---------------
+    // 数组去重
+    _.uniq = _.unique = function(array, isSorted, iteratee, context) {
+        // 如果isSorted不是boolean类型
+        if (!_.isBoolean(isSorted)) {
+            context = iteratee;
+            iteratee = isSorted;
+            isSorted = false;
+        }
+        // 如果iteratee是函数，进行二次封装
+        // 如果存在context，则iteratee最终指向一个标准的迭代函数 function (value, idx, collection) {}
+        if (iteratee != null) iteratee = cb(iteratee, context);
+        var result = [];
+        var seen = [];
+
+        for (var i = 0, length = getLength(array); i < length; i++) {
+            // 如果存在iteratee，当前元素遍历得到的值就是iteratee的结果
+            // 这里采取了一个优化算法，就是如果是排好序的数组,当前元素和上一个元素进行比较即可，因为经过排序后，如果相同的元素会在一起
+            var value = array[i],
+                computed = iteratee ? iteratee(value, i, array) : value;
+            if (isSorted) {
+                // 比较当前元素和上一个元素是否相同，如果当前元素是起始元素或者当前元素和上一个元素不同
+                if (!i || seen !== computed) result.push(value);
+                // 当遍历完当前元素，设置上一个元素为当前元素，便于下次迭代
+                seen = computed;
+            } else if (iteratee) {
+                // 如果没有排序并且存在iteratee，将iteratee的结果是否存在seen，如果不存在则存储iteratee的结果
+                if (!_.contains(seen, computed)) {
+                    seen.push(computed);
+                    result.push(value);
+                }
+            } else if (!_.contains(result, value)) {
+                result.push(value);
+            }
+        }
+        return result;
+    };
+
+    // Produce an array that contains the union: each distinct element from all of
+    // the passed-in arrays.
+    _.union = restArgs(function(arrays) {
+        return _.uniq(flatten(arrays, true, true));
+    });
+
+    // Produce an array that contains every item shared between all the
+    // passed-in arrays.
+    // ---------------
+    // 查找array的元素是否都存在于除了array以后的所有数组中，并且array的元素是去重的
+    _.intersection = function(array) {
+        // 得到去重和都存在后续数组中的元素
+        var result = [];
+        var argsLength = arguments.length;
+        for (var i = 0, length = getLength(array); i < length; i++) {
+            var item = array[i];
+            // 如果存在相同，跳出当前循环，保证当前元素在result是唯一的
+            if (_.contains(result, item)) continue;
+            var j;
+            // 如果在后续的数组都存在当前元素，则result存储当前元素
+            for (j = 1; j < argsLength; j++) {
+                if (!_.contains(arguments[j], item)) break;
+            }
+            if (j === argsLength) result.push(item);
+        }
+        return result;
+    };
+
+    // Complement of _.zip. Unzip accepts an array of arrays and groups
+    // each array's elements on shared indices.
+    // ---------------
+    // 将二维数组中的每个元素按索引进行统计
+    // array: [['xx', 1], ['oo', 2]]
+    // => [['xx', 'oo'], [1, 2]];
+    _.unzip = function(array) {
+        var length = array && _.max(array, getLength).length || 0;
+        var result = Array(length);
+
+        for (var index = 0; index < length; index++) {
+            result[index] = _.pluck(array, index);
+        }
+        return result;
+    };
+
+    // Zip together multiple lists into a single array -- elements that share
+    // an index go together.
+    // ---------------
+    // 因为_.unzip接收的是二维数组，通过restArgs支持默认参数数组形式，可以传入多个数组
+    // _.zip(['xx', 1], ['oo', 2])
+    _.zip = restArgs(_.unzip);
 
     // Generator function to create the findIndex and findLastIndex functions.
     // --------------------

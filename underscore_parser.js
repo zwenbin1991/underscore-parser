@@ -1014,7 +1014,133 @@
     // If the array is large and already in sort order, pass `true`
     // for **isSorted** to use binary search.
     // --------------------
-    // 和ES5的Array.prototype.indexOf
+    // 和ES5的Array.prototype.indexOf和Array.prototype._lastIndexOf一致
     _.indexOf = createIndexFinder(1, _.findIndex, _.sortedIndex);
     _.lastIndexOf = createIndexFinder(-1, _.findLastIndex);
+
+    // Generate an integer Array containing an arithmetic progression. A port of
+    // the native Python `range()` function. See
+    // [the Python documentation](http://docs.python.org/library/functions.html#range).
+    // --------------------
+    // 得到一段范围内的数组
+    _.range = function(start, stop, step) {
+        // 如果没传任何参数 => start = 0 stop = 0
+        // 如果只传1个参数 => stop = start start = 0
+        if (stop == null) {
+            stop = start || 0;
+            start = 0;
+        }
+
+        // 如果没有穿step，设置默认迭代值为1,
+        // 如果stop >= start 正向
+        // 如果stop < start 逆向
+        if (!step) {
+            step = stop < start ? -1 : 1;
+        }
+        // 根据start到stop直接的数字除以迭代值得到个数
+        var length = Math.max(Math.ceil((stop - start) / step), 0);
+        var range = Array(length);
+
+        for (var idx = 0; idx < length; idx++, start += step) {
+            range[idx] = start;
+        }
+
+        return range;
+    };
+
+    // Split an **array** into several arrays containing **count** or less elements
+    // of initial array.
+    // 根据count提取二位数组的子数组的元素个数
+    _.chunk = function(array, count) {
+        if (count == null || count < 1) return [];
+
+        var result = [];
+        var i = 0, length = array.length;
+        while (i < length) {
+            result.push(slice.call(array, i, i += count));
+        }
+        return result;
+    };
+
+    // Function (ahem) Functions
+    // ------------------
+    // 函数扩展方法列表
+
+    // Determines whether to execute a function as a constructor
+    // or a normal function with the provided arguments.
+    var executeBound = function(sourceFunc, boundFunc, context, callingContext, args) {
+        if (!(callingContext instanceof boundFunc)) return sourceFunc.apply(context, args);
+        var self = baseCreate(sourceFunc.prototype);
+        var result = sourceFunc.apply(self, args);
+        if (_.isObject(result)) return result;
+        return self;
+    };
+
+    // Create a function bound to a given object (assigning `this`, and arguments,
+    // optionally). Delegates to **ECMAScript 5**'s native `Function.bind` if
+    // available.
+    // ------------------
+    // 和ES5的Function.prototype.bind用法一致
+    // 假设 var XX = _.bind(function A () {}, oo);
+    // var xx = new XX('挖掘机')，如果通过new 去实例化一个对象，那么最终返回的是一个原型继承A.prototype的对象
+    _.bind = restArgs(function(func, context, args) {
+        if (!_.isFunction(func)) throw new TypeError('Bind must be called on a function');
+        var bound = restArgs(function(callArgs) {
+            return executeBound(func, bound, context, this, args.concat(callArgs));
+        });
+        return bound;
+    });
+
+    // Partially apply a function by creating a version that has had some of its
+    // arguments pre-filled, without changing its dynamic `this` context. _ acts
+    // as a placeholder by default, allowing any combination of arguments to be
+    // pre-filled. Set `_.partial.placeholder` for a custom placeholder argument.
+    // ------------------
+    // 和_.bind相同的用户
+    // 不同的是不能绑定其他的上下文，只能是当前上下文
+    // var x = _.partial(function A () {}, oo)
+    // x(10)，A函数的上下文在node.js中是global，浏览器中是window
+    _.partial = restArgs(function(func, boundArgs) {
+        var placeholder = _.partial.placeholder;
+        var bound = function() {
+            var position = 0, length = boundArgs.length;
+            var args = Array(length);
+            for (var i = 0; i < length; i++) {
+                args[i] = boundArgs[i] === placeholder ? arguments[position++] : boundArgs[i];
+            }
+            while (position < arguments.length) args.push(arguments[position++]);
+            return executeBound(func, bound, this, this, args);
+        };
+        return bound;
+    });
+
+    // Bind a number of an object's methods to that object. Remaining arguments
+    // are the method names to be bound. Useful for ensuring that all callbacks
+    // defined on an object belong to it.
+    // ------------------
+    // 绑定keys中每一个存在obj的key的函数
+    _.bindAll = restArgs(function(obj, keys) {
+        keys = flatten(keys, false, false);
+        var index = keys.length;
+        if (index < 1) throw new Error('bindAll must be passed function names');
+        while (index--) {
+            var key = keys[index];
+            obj[key] = _.bind(obj[key], obj);
+        }
+    });
+
+    // Memoize an expensive function by storing its results.
+    // ------------------
+    // 创建一个闭包函数，用于存储func的结果
+    // 如过hasher存在，将hasher结果作为key表示func的结果
+    _.memoize = function(func, hasher) {
+        var memoize = function(key) {
+            var cache = memoize.cache;
+            var address = '' + (hasher ? hasher.apply(this, arguments) : key);
+            if (!_.has(cache, address)) cache[address] = func.apply(this, arguments);
+            return cache[address];
+        };
+        memoize.cache = {};
+        return memoize;
+    };
 })();

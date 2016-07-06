@@ -945,4 +945,74 @@
     _.findIndex = createPredicateIndexFinder(1);
     _.findLastIndex = createPredicateIndexFinder(-1);
 
+    // Use a comparator function to figure out the smallest index at which
+    // an object should be inserted so as to maintain order. Uses binary search.
+    // --------------------
+    // 使用二分查找法进行查找
+    // array: [10, 26, 30, 40, 50] obj: 35
+    // 二分查找规则是：
+    // 数组是有序数组
+    // 以起始位置大于等于结尾位置结束
+    // 确定起始位置和结尾位置的中间位置
+    // 如果中间位置的值小于给定的值，起始位置重新赋值为中间位置的后一个位置
+    // 如果中间位置的值大于等于给定的值，起始位置重新赋值为当前中间位置
+    _.sortedIndex = function(array, obj, iteratee, context) {
+        iteratee = cb(iteratee, context, 1);
+        // 如果iteratee存在并且是函数或者不存在返回function(value) { return value }
+        var value = iteratee(obj);
+        // 定义起始位置和结尾位置
+        // 这里underscore.js定义的结束位置起始就是在当前数组最后默认添加一个空位置
+        var low = 0, high = getLength(array);
+        while (low < high) {
+            var mid = Math.floor((low + high) / 2);
+            if (iteratee(array[mid]) < value) low = mid + 1; else high = mid;
+        }
+        return low;
+    };
+
+    // Generator function to create the indexOf and lastIndexOf functions.
+    var createIndexFinder = function(dir, predicateFind, sortedIndex) {
+        return function(array, item, idx) {
+            var i = 0, length = getLength(array);
+            if (typeof idx == 'number') {
+                // idx如果为正，代表在当前方向的idx位置
+                // idx如果为负，代表在当前方向推了idx的位置
+                if (dir > 0) {
+                    // 如果是正向查找
+                    // 重置查找位置
+                    // 如果查找位置大于等于0，不变
+                    // 如果查找位置小于0，确保查找位置大于等于0
+                    i = idx >= 0 ? idx : Math.max(idx + length, i);
+                } else {
+                    // 如果是逆向查找
+                    // 重置数组长度
+                    // 如果起始值大于等于0，防止起始值超过长度
+                    length = idx >= 0 ? Math.min(idx + 1, length) : idx + length + 1;
+                }
+            }
+            // 如果传入起始位置不是number类型，并且数组是排序好的，不过基本用不到
+            else if (sortedIndex && idx && length) {
+                idx = sortedIndex(array, item);
+                return array[idx] === item ? idx : -1;
+            }
+            // 如果item是NaN类型，查找数组里面是否有NaN，如果有就返回索引
+            if (item !== item) {
+                idx = predicateFind(slice.call(array, i, length), _.isNaN);
+                return idx >= 0 ? idx + i : -1;
+            }
+
+            // 判断array是否匹配，如果匹配返回索引
+            for (idx = dir > 0 ? i : length - 1; idx >= 0 && idx < length; idx += dir) {
+                if (array[idx] === item) return idx;
+            }
+            return -1;
+        };
+    };
+
+    // Return the position of the first occurrence of an item in an array,
+    // or -1 if the item is not included in the array.
+    // If the array is large and already in sort order, pass `true`
+    // for **isSorted** to use binary search.
+    _.indexOf = createIndexFinder(1, _.findIndex, _.sortedIndex);
+    _.lastIndexOf = createIndexFinder(-1, _.findLastIndex);
 })();

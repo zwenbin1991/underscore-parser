@@ -976,7 +976,7 @@
             var i = 0, length = getLength(array);
             if (typeof idx == 'number') {
                 // idx如果为正，代表在当前方向的idx位置
-                // idx如果为负，代表在当前方向推了idx的位置
+                // idx如果为负，代表在当前方向的length + idx位置
                 if (dir > 0) {
                     // 如果是正向查找
                     // 重置查找位置
@@ -1013,6 +1013,8 @@
     // or -1 if the item is not included in the array.
     // If the array is large and already in sort order, pass `true`
     // for **isSorted** to use binary search.
+    // --------------------
+    // 和ES5的Array.prototype.indexOf
     _.indexOf = createIndexFinder(1, _.findIndex, _.sortedIndex);
     _.lastIndexOf = createIndexFinder(-1, _.findLastIndex);
 })();

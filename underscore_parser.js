@@ -1096,10 +1096,10 @@
     // as a placeholder by default, allowing any combination of arguments to be
     // pre-filled. Set `_.partial.placeholder` for a custom placeholder argument.
     // ------------------
-    // 和_.bind相同的用户
-    // 不同的是不能绑定其他的上下文，只能是当前上下文
-    // var x = _.partial(function A () {}, oo)
-    // x(10)，A函数的上下文在node.js中是global，浏览器中是window
+    // 和_.bind相同的用法
+    // 不同的是如果在var b = _.partial(function A () {}, _)的实参数中出现了_，就相当于提供了一个占位符
+    // 占位符最终的值就是调用b时候传入的第一个参数
+    // A函数的上下文不能改变
     _.partial = restArgs(function(func, boundArgs) {
         var placeholder = _.partial.placeholder;
         var bound = function() {
@@ -1143,4 +1143,153 @@
         memoize.cache = {};
         return memoize;
     };
+
+    // Delays a function for the given number of milliseconds, and then calls
+    // it with the arguments supplied.
+    // ------------------
+    // 延时执行
+    _.delay = restArgs(function(func, wait, args) {
+        return setTimeout(function() {
+            return func.apply(null, args);
+        }, wait);
+    });
+
+    // Defers a function, scheduling it to run after the current call stack has
+    // cleared.
+    // ------------------
+    // 1毫秒执行_delay
+    _.defer = _.partial(_.delay, _, 1);
+
+    // Returns a function, that, when invoked, will only be triggered at most once
+    // during a given window of time. Normally, the throttled function will run
+    // as much as it can, without ever going more than once per `wait` duration;
+    // but if you'd like to disable the execution on the leading edge, pass
+    // `{leading: false}`. To disable execution on the trailing edge, ditto.
+    // ------------------
+    // 函数节流，通过达到间隔时间执行函数起到阻断函数的连续执行
+    // 实现思路
+    // 在函数中必须定义2个变量、存储setTimeout的唯一值和存储上一次函数执行的时间戳，如果需要改变执行函数的上下文或传递参数，可以定义存储上下文变量和存储参数数组变量
+    _.throttle = function(func, wait, options) {
+        // 定义存储定时器，上下文对象，传入的参数，func返回的结果，上一次函数执行的时间戳
+        var timeout, context, args, result;
+        var previous = 0;
+        if (!options) options = {};
+
+        // 定义当停止函数连续执行动作后，最后在执行一次函数
+        var later = function() {
+            previous = options.leading === false ? 0 : _.now();
+            timeout = null;
+            result = func.apply(context, args);
+            if (!timeout) context = args = null;
+        };
+
+        var throttled = function() {
+            // 定义当前时间戳
+            var now = _.now();
+            if (!previous && options.leading === false) previous = now;
+            // 得到间隔时间
+            var remaining = wait - (now - previous);
+            context = this;
+            args = arguments;
+            // 判断是否是第一次执行函数，或者执行时间大于等于等候时间，这时候可以执行函数了
+            if (remaining <= 0 || remaining > wait) {
+                if (timeout) {
+                    clearTimeout(timeout);
+                    timeout = null;
+                }
+                // 函数执行完成，将上一次函数执行时间戳重新设置为当前时间戳
+                previous = now;
+                result = func.apply(context, args);
+                if (!timeout) context = args = null;
+            }
+            // 阻断当执行时间没有达到等候时间函数
+            // 确保连续执行动作结束后，如果执行时间没有达到等候时间，函数还可以最后执行1次
+            else if (!timeout && options.trailing !== false) {
+                timeout = setTimeout(later, remaining);
+            }
+            return result;
+        };
+
+        throttled.cancel = function() {
+            clearTimeout(timeout);
+            previous = 0;
+            timeout = context = args = null;
+        };
+
+        return throttled;
+    };
+
+    // Returns a function, that, as long as it continues to be invoked, will not
+    // be triggered. The function will be called after it stops being called for
+    // N milliseconds. If `immediate` is passed, trigger the function on the
+    // leading edge, instead of the trailing.
+    // ------------------
+    // 函数节流，阻断函数连续执行，并有且只执行1次
+    // immediate标示在连续执行动作之前，就执行1次
+    _.debounce = function(func, wait, immediate) {
+        var timeout, result;
+
+        var later = function(context, args) {
+            timeout = null;
+            if (args) result = func.apply(context, args);
+        };
+
+        var debounced = restArgs(function(args) {
+            if (timeout) clearTimeout(timeout);
+            if (immediate) {
+                var callNow = !timeout;
+                timeout = setTimeout(later, wait);
+                if (callNow) result = func.apply(this, args);
+            } else {
+                timeout = _.delay(later, wait, this, args);
+            }
+
+            return result;
+        });
+
+        debounced.cancel = function() {
+            clearTimeout(timeout);
+            timeout = null;
+        };
+
+        return debounced;
+    };
+
+    // Returns the first function passed as an argument to the second,
+    // allowing you to adjust arguments, run code before and after, and
+    // conditionally execute the original function.
+    // ------------------
+    // 将func作为wrapper第一个参数，可以将func先运行或后运行
+    _.wrap = function(func, wrapper) {
+        return _.partial(wrapper, func);
+    };
+
+    // Returns a function that will only be executed on and after the Nth call.
+    // ------------------
+    // func在执行了第times次后在执行
+    _.after = function(times, func) {
+        return function() {
+            if (--times < 1) {
+                return func.apply(this, arguments);
+            }
+        };
+    };
+
+    // Returns a function that will only be executed up to (but not including) the Nth call.
+    // func在执行了第timers次后在执行，并且只执行1次，返回第timers - 1次的结果
+    _.before = function(times, func) {
+        var memo;
+        return function() {
+            if (--times > 0) {
+                memo = func.apply(this, arguments);
+            }
+            if (times <= 1) func = null;
+            return memo;
+        };
+    };
+
+    // Returns a function that will be executed at most one time, no matter how
+    // often you call it. Useful for lazy initialization.
+    // 确保函数只执行1次
+    _.once = _.partial(_.before, 2);
 })();

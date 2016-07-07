@@ -1,7 +1,5 @@
 # underscore 1.8.3 源码剖析
 
-简介
--
 underscore.js是一个轻量、实用、兼容低版本浏览器的JavaScript工具库并且支持JavaScript多环境下使用。
 
 主要
@@ -12,7 +10,8 @@ underscore.js是一个轻量、实用、兼容低版本浏览器的JavaScript工
 -
 最近这段时间也是在重新沉淀自己的技术栈和学习新的技术，虽然在js编码风格上使用函数式编程是一个非常好的习惯，但是自己并没有一个详细的概念，想到underscore.js几乎大量的api的实现都是基于函数式的，所以就考虑通过读源码的形式进行了解。
 
-学习到了什么
+剖析underscore的"干货"系列
 -
-* [JavaScript函数式编程]()
-
+* [JavaScript函数式编程](https://github.com/zwenbin1991/underscore-parser/issues/1)
+* [内部方法restArgs详解](https://github.com/zwenbin1991/underscore-parser/issues/2)
+* [数组去重](https://github.com/zwenbin1991/underscore-parser/issues/3)
